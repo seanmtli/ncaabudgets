@@ -1,0 +1,106 @@
+---
+title: "Exploring the Financial Impacts of NCAA Division I Athletics Conference Realignments"
+author: "Sean Li"
+date: "2023-12-18"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r packages, message=FALSE, warning=FALSE, echo=FALSE}
+library(tidyverse)
+library(kableExtra)
+library(tidytuesdayR)
+```
+
+```{r load-data, message=FALSE, warning=FALSE, echo=FALSE}
+sports <- read.csv("sports.csv")
+```
+
+## Introduction
+
+### Background
+College sports in the United States bring in over 15.8 billion dollars in revenue a year according to the NCAA in 2019. The lions share of those revenue come from football - with each school averaging 31.9 million dollars per school annually. These dollars come mainly from the huge TV streaming rights such as ESPN. The dominance of college football in revenue generation can be shown with a quick comparison. Duke University, one of the top programs in men's basketball (the 2nd most revenue generating sport), brings in approximately 37 million dollars while top football programs such as Alabama or Georgia reel in over 3 times that, at about 110 million dollars. 
+
+However, all these revenue dollars doesn't equate to a profitability. In 2019, only around 20% schools in the high grossing Football Bowl Subdivision (FBS) report a net positive operating margin (NCAA, 2019). Main expense items include 35% to administrative and coaches, 18% on athletic facilities, and 19% to student athletes themselves in the form of scholarships. Although the expenditure has also been steadily increasing over the last few years, athletic departments are not too concerned. 
+
+### How does revenue work in college sports?  
+Unlike professional sports, athletic departments do not have bottom line-profits and stockholders that pressure them; instead the stakeholders such as alumni, students, and boosters want victories. Aside from just an increase in revenue, a great sports scene makes good publicity for the school, increases the recruiting odds of top athletes (who generate more revenue and victories), contribute to the total number of applications, and also can positively impact alumni donations. This makes our analysis ever more interesting, as it deviates from the traditional sports business incentive alignments slightly.
+
+The NCAA DOES NOT CONTROL football revenues and how they are shared, in fact they have zero decision making power here. The conferences themselves all make and control their own football revenue (including from the media). For example, the ACC
+
+### Why does it matter? 
+The landscape of NCAA sports has undergone dynamic transformations in recent years, with a central focus on the financial implications of collegiate athletics. The rise of NIL deals from July 1st of 2021 has greatly impacted the entrepreneurial ventures of student athletes since they are now allowed to promote their "Name, Image, and Likeness" in brand sponsorships, advertisements, and other deals. More importantly, the impact of recent conference realignments further amplifies the complexities surrounding sports budgets. Conference shifts not only reshape competitive dynamics but also pose significant financial challenges and opportunities, with schools strategically positioning themselves to maximize revenue potential. 
+
+### Objectives and Goals
+This study delves into the intricate relationship between NCAA sports budgets, particularly football spending, analyzing the repercussions of recent conference realignments on the fiscal trajectories of collegiate athletics.
+
+The future of college football is changing with conferences merging and the playoff structure. In 2024, Oklahoma and Texas are leaving the Big 12 to join the SEC and UCLA and USC are leaving the Pac-12 for the Big 10 conference. They were the first to leave their respective conferences, and then other schools like Colorado, Arizona, Utah, Oregon and Washington followed suit -- leaving the Pac 12 conference with only 2 schools. According to the an article written by the Washington Post, the domino effects have crumbled a 100 year old college group began with an intent to increase revenue from bigger television deals (Bonesteel, 2023). In our research, we will first quantify how much will this potentially affect projected revenue. We will specifically try to predict how much revenue a specific school will generate in next year, focusing on those institutions that have changed a conference. Will existing football powerhouses benefit the most from the realignments or does the revenue project to distribute equally among all schools? What patterns currently exist from the Big 10 or SEC in revenue that could allow us to identify key reasons for moving conferences? 
+
+Understanding these dynamics is key for institutions seeking to optimize their financial strategies and adapt to the evolving paradigm of collegiate sports.
+
+### Dataset Overview
+
+The data I'll be working with are from the tidytuesday collection of datasets and Knight-Newhouse College Athletics Database. Specifically, the main dataset from tidytuesday came from Equity in Athletics Data Analysis, a sub department of the US Department of Education. The years included span from 2015-2019. However I've gone ahead and done the work to conjoin that with data from 2020, 2021, and 2022. Some of the main variables we will use study include: school, year, sport, spending, # of male student athletes, # of female student athletes, revenue men, revenue women, expenditure men, expenditure women. I've also feature engineered out a 'conference' variable for obvious reasons. 
+
+### EDA: Power 5 Conference Revenue 
+
+```{r conferenceEDA, message=FALSE, warning=FALSE, echo=FALSE}
+# Create vectors for the dataset
+years <- rep(2013:2022, each = 2)  
+conferences <- rep(c("Conference A", "Conference B"), times = 10)  
+revenue <- c(100, 120, 110, 130, 105, 125, 115, 135, 95, 115)  
+
+
+# Create a data frame
+conference_revenues <- data.frame(year = years, conference = conferences, revenue_men = revenue_men)
+
+# Print the resulting dataset
+print(conference_revenues)
+
+# Save the dataset as a CSV file
+write.csv(conference_revenues, file = "/conference_revenues_2013_2022.csv", row.names = FALSE)
+
+```
+
+
+figure name Big 10, SEC conferences on top with a growing moat to the rest
+
+
+
+Even in a conference such as the ACC, 3rd in revenue among all Division I conferences -- schools like Clemson, North Carolina, and Florida State are looking to leave. One of the reasons for the schools wanting to leave is the sizeable gap in revenue when comparing the ACC to the Big Ten and SEC. The revenue for the 2022 fiscal year is out for the ACC and while they saw an increase in total revenue, it still trails the other two conferences.
+
+## Methodology
+
+### Clustering Analysis
+Who will be the biggest benefactors of new conferences? Will it be those who join? Will it instead be the existing powerhouses? In order to find out, I will create categorical groupings of schools based upon a set of heuristics. There will be three main types of schools: large, traditional powerhouses that are within the top 3 schools in revenue generation, middle of the pack schools that do well in revenue generation, and bottom-feeders mainly gaining revenue from shared conference media deals. 
+
+### Revenue Modeling through Regression 
+To understand the relative impact of conference on spending, I plan to fit a multivariate linear regression predicting total revenues for schools, and use the predictions from fitted model to quantify the impact of specific schools shifting conferences. 
+
+The proposed methodology of fitting a multivariate linear regression to predict total revenues for schools and using the model predictions to quantify the impact of specific schools shifting conferences is justified for several reasons. First, 
+
+Assumptions for the regression model would be independence, normality, and also linearity -- which we can run model diagnostics on (Appendix A).
+
+## Results
+
+## Discussion
+
+### Future Work: The Flip Side of the Balance Sheet
+We focused mainly on the revenue side of things - however, as mentioned before only a small fraction of all collegiate athletics programs are profitable. Furthermore, some argue that the spending isn't even going into the right places. On the other side of the balance sheet, what can the spending patterns tell us about future projected spending across college football? Is the road to profitability more clear with these new conferences? 
+
+
+## Appendix 
+
+### Works Cited
+
+https://www.usatoday.com/story/sports/college/2023/05/19/power-5-conferences-earnings-billions-2022/
+https://knightnewhousedata.org/reports/34d8027f 
+https://www.washingtonpost.com/sports/2023/08/07/college-sports-conference-realignment/ 
+https://ope.ed.gov/athletics/#/datafile/list
+https://athleticdirectoru.com/articles/revenue-per-quality-of-college-football-recruit/
+https://ncaaorg.s3.amazonaws.com/research/Finances/2020RES_D1-RevExp_Report.pdf 
+https://www.pbs.org/newshour/economy/analysis-who-is-winning-in-the-high-revenue-world-of-college-sports 
