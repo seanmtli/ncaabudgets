@@ -1,5 +1,5 @@
 ---
-title: "Exploring the Financial Impacts of NCAA Division I Athletics Conference Realignments"
+title: "Exploring the Financial Impacts of College Football Conference Realignments"
 author: "Sean Li"
 date: "2023-12-18"
 output: pdf_document
@@ -25,10 +25,10 @@ sports <- read.csv("sports.csv")
 ### Background
 College sports in the United States bring in over 15.8 billion dollars in revenue a year according to the NCAA in 2019. The lions share of those revenue come from football - with each school averaging 31.9 million dollars per school annually. These dollars come mainly from the huge TV streaming rights such as ESPN. The dominance of college football in revenue generation can be shown with a quick comparison. Duke University, one of the top programs in men's basketball (the 2nd most revenue generating sport), brings in approximately 37 million dollars while top football programs such as Alabama or Georgia reel in over 3 times that, at about 110 million dollars. 
 
-### How does revenue work in college sports?  
+### How does revenue work in college football?  
 Unlike professional sports, athletic departments do not have bottom line-profits and stockholders that pressure them; instead the stakeholders such as alumni, students, and boosters want victories. Aside from just an increase in revenue, a great sports scene makes good publicity for the school, increases the recruiting odds of top athletes (who generate more revenue and victories), contribute to the total number of applications, and also can positively impact alumni donations. This makes our analysis ever more interesting, as it deviates from the traditional sports business incentive alignments slightly.
 
-The NCAA DOES NOT CONTROL football revenues and how they are shared, in fact they have zero decision making power here. The conferences themselves all make and control their own football revenue (including from the media). Usually, the distribution is largely split evenly, with heavier emphasis for teams playing on prime time ESPN, or winning in the College Football Playoffs. Each conference receives 6 million dollars from the College Football Playoff for each team selected for a semifinal game and 4 million for each time that plays in a non-playoff bowl. The Big 10 distributes those payouts evenly after the participating team keeps some to pay for the expenses of the playoff trip (Big 10 Handbook). So it doesn't make a huge difference if it is Wisconsin or Michigan going to represent the Big 10 in the playoff - all the Big 10 teams will receive a even split of the pot. However, not all conferences have this same policy. The ACC has recently committed to a new revenue model that rewards schools more based on postseason performance in hopes of closing the revenue gap from SEC and Big 10. 
+The NCAA does NOT control football revenues and how they are shared, in fact they have zero decision making power here. The conferences themselves all make and control their own football revenue (including from the media). Usually, the distribution is largely split evenly, with heavier emphasis for teams playing on prime time ESPN, or winning in the College Football Playoffs. Each conference receives 6 million dollars from the College Football Playoff for each team selected for a semifinal game and 4 million for each time that plays in a non-playoff bowl. The Big 10 distributes those payouts evenly after the participating team keeps some to pay for the expenses of the playoff trip (Big 10 Handbook). So it doesn't make a huge difference if it is Wisconsin or Michigan going to represent the Big 10 in the playoff - all the Big 10 teams will receive a even split of the pot. However, not all conferences have this same policy. The ACC has recently committed to a new revenue model that rewards schools more based on postseason performance in hopes of closing the revenue gap from SEC and Big 10. 
 
 ### Why does it matter? 
 The landscape of NCAA sports has undergone dynamic transformations in recent years, with a central focus on the financial implications of collegiate athletics. The rise of NIL deals from July 1st of 2021 has greatly impacted the entrepreneurial ventures of student athletes since they are now allowed to promote their "Name, Image, and Likeness" in brand sponsorships, advertisements, and other deals. More importantly, the impact of recent conference realignments further amplifies the complexities surrounding sports budgets. Conference shifts not only reshape competitive dynamics but also pose significant financial challenges and opportunities, with schools strategically positioning themselves to maximize revenue potential. 
@@ -42,7 +42,7 @@ Understanding these dynamics is key for institutions seeking to optimize their f
 
 ### Dataset Overview
 
-The data I'll be working with are from the tidytuesday collection of datasets and Knight-Newhouse College Athletics Database. Specifically, the main dataset from tidytuesday came from Equity in Athletics Data Analysis, a sub department of the US Department of Education. The NCAA is obligated to report their financial statements every fiscal year - which is the original source. The years included span from 2015-2019. However I've gone ahead and done the work to conjoin that with data from 2020, 2021, and 2022. Some of the main variables we will use study include: school, year, sport, spending, # of male student athletes, # of female student athletes, revenue men, revenue women, expenditure men, expenditure women. I've also feature engineered out a 'conference' variable for obvious reasons. 
+The data I'll be working with are from the tidytuesday collection of datasets and Knight-Newhouse College Athletics Database. Specifically, the main dataset from tidytuesday came from Equity in Athletics Data Analysis, a sub department of the US Department of Education. The NCAA is obligated to report their financial statements every fiscal year - which is the original source. The years included span from 2015-2019. However I've gone ahead and done the work to conjoin that with data from 2020, 2021, and 2022. Some of the main variables include: school, year, sport, spending, total undergraduate population, number of male student athletes, number of female student athletes, revenue men, revenue women, expenditure men, expenditure women. I've also feature engineered out a 'conference' variable for obvious reasons. Overall, the dataframe has around 132,327 observations with 632 of them from football. 
 
 ### EDA: Power 5 Conference Revenue 
 
@@ -70,11 +70,11 @@ conference_revenues <- data.frame(year = years, conference = conferences, revenu
 ```{r lineplotEDA, message=FALSE, warning=FALSE, echo=FALSE}
 ggplot(conference_revenues, aes(x = year, y = revenue, color = conference, group = conference)) +
   geom_line() +
-  labs(title = "Conference Median Revenue Over the Last 10 Years",
+  labs(title = "Conference Median Football Revenue Over the Last 10 Years",
        x = "Year",
        y = "Revenue",
        subtitle = "Big 10, SEC on top with a sizable moat to the rest",
-       caption = "Note: Revenue in millions From NCAA Conference Distribution, Media Rights, and Post-Season Football") +
+       caption = "Note: Revenue in millions") +
   theme_minimal() +
   scale_x_discrete(limits = c(2012,2014,2016,2018,2020,2022))
 ```
@@ -93,9 +93,9 @@ To determine the potential beneficiaries of new conferences, the focus is not so
 ### Revenue Modeling through Regression 
 To understand the relative impact of conference on revenue, I plan to fit a multivariate linear regression predicting total revenues for schools, and use the predictions from fitted model to quantify the impact of specific schools shifting conferences. 
 
-$$\text{Revenue} = \beta_0 + \beta_1\text{conference} + \beta_2 \text{enrollment}  + \beta_3 \text{spending} + \beta_4 \text{schooltype} + \beta_5 \text{fbcategory} + \epsilon$$
+$$\text{Revenue} = \beta_0 + \beta_1\text{conference} + \beta_2 \text{enrollment}  + \beta_3 \text{spending} + \beta_4 \text{schooltype} + \beta_5 \text{fbcategory} + \epsilon \\ \epsilon \sim N(0, \sigma)$$
 
-The proposed methodology of fitting a multivariate linear regression to predict total revenues for schools and using the model predictions to quantify the impact of specific schools shifting conferences is justified for several reasons. First, since the goal is to quantify the specific revenue impacts of conference realignments, its appropriate to use a regression model as it fit most appropriately to obtain a numerical prediction. Furthermore, a regression model allows us to control for other factors such as the # of school student athletes, conference, spending, private vs public school, and the football category. 
+The proposed methodology of fitting a multivariate linear regression to predict total revenues for schools and using the model predictions to quantify the impact of specific schools shifting conferences is justified for several reasons. First, since the goal is to quantify the specific revenue impacts of conference realignments, its appropriate to use a regression model as it fit most appropriately to obtain a numerical prediction. Furthermore, a regression model allows us to control for other factors such as the number of school student athletes, conference, spending, private vs public school, and the football category. 
 
 A linear regression specifically optimizes for an ease of interpretation and we can use the coefficients for conference variables to directly interpret an estimated change in total revenues - holding all other variables constant.  
 
@@ -208,7 +208,7 @@ The SEC has the largest coefficient among the conferences at about 15.9 million,
 
 ### School Predictions
 
-We now apply this model to obtain some projections for schools that are going to a new conference. 
+We now apply this model to obtain some projections for a subset schools that are going to a new conference. This is not an exhaustive list of schools that are going to a new conference - it is merely meant to give an idea of what schools of different football category and conference might see in predicted future annual revenues. 
 
 ```{r predictions, message=FALSE, warning=FALSE, echo=FALSE}
 predictions <- data.frame(
@@ -220,34 +220,92 @@ predictions <- data.frame(
   prednewrev = c(54.34, 64.85, 73.4, 32.18)
 )
 
-kable(predictions, format = "latex", booktabs = TRUE, col.names = c("School", "FB Category", "Current Conf","New Conf", "Current Rev", "Predicted New Rev"), caption = "Projected New Revenues of 4 Schools with a New Conference") %>% 
-  kable_styling(latex_options = "HOLD_position", font_size=10)
+kable(predictions, format = "latex", booktabs = TRUE, col.names = c("School", "FB Category", "Current Conf","New Conf", "Current Rev", "Predicted New Rev"), caption = "Projected New Revenues of 4 Schools with a New Conference (revenue in millions)") %>% 
+  kable_styling(latex_options = "HOLD_position", font_size=10) 
 ```
 
 It's no surprise that the top schools in a conference leaving to join a more lucrative conference would result in the largest percentage projected increase in revenue. Although currently UCLA and Oregon both bring in about 40 million in revenue, this will start to diverge more as they enter the Big 10 due to how competitive the conference is. Furthermore, a school such as Cal Berkeley (a bottom-feeder in terms of college football in the Pac 12) will only decrease its projected revenue as it moves to a less lucrative conference in the ACC.
 
 ### Media Deal Analysis 
 
-* list item 1
-  + item 2
-  + item 3
+According to the latest up to date coverage of business in college sports, I've compiled the conferences based upon which networks they have deals with, when those deals expire, how much their worth in total and on a per year, per school amount. The list is ordered from greatest to least in terms of per-school, per-year average payouts. 
+
+* BIG 10
+  + Network: FOX/FS1, CBS, NBC
+  + Deal Expiration: 2030
+  + Total Value: $8 billion
+  + Per-school, per-year average: $71.8 million
+* SEC
+  + Network: ESPN/CBS/ABC
+  + Deal Expiration: 2036
+  + Total Value: $7.1 billion
+  + Per-school, per-year average: $68.8 million
+* BIG 12
+  + Network: ESPN/FOX/FS1
+  + Deal Expiration: 2031
+  + Total Value: $2.3 billion
+  + Per-school, per-year average: $31.7 million
+* PAC-12
+  + Network: ESPN/FOX
+  + Deal Expiration: 2024
+  + Total Value: $3 billion
+  + Per-school, per-year average: $20.8 million
+* ACC
+  + Network: ESPN
+  + Deal Expiration: 2036
+  + Total Value: $4.8 billion
+  + Per-school, per-year average: $17.1 million
+
 
 ## Discussion
 
+The dawn of a new era in College Football has emerged and it has everything to do with maximizing revenue.
+
+The BIG 10 and the SEC are the future of college football. Our analysis provides a holistic arguement to be made that those two conferences hold the money power over the others -- attracting schools from other conferences to jump ship and change allegiances. Our model shows that their conference influence is a significant factor in revenue prediction. They hold a sizeable gap in average revenue per year - with a projected combined total of $15 billion in media deals, over double of the other Power 5 conferences combined. 
+
+We have accomplished the goal of quantifying the projected revenues of schools that have moved, and on average - the schools moving into the BIG 10 can expect at least a 45% increase in yearly revenue from media deals while schools moving into the SEC can expect around a 30% increase in yearly revenue from media deals on average. 
+
+The PAC-12 conference is left with merely hanging on to survival with 2 schools left after August 2024.  Washington State and Oregon State who remain will seek to either find another league to join or go independent without an intercollegiate athletic conference. Furthermore, the PAC-12 media deal with ESPN ends in 2024 - with no signs of anything new on the horizon. 
+
+All signs point to the creation of "superconferences" forming. If the current trends continue to occur, we could see conferences like the ACC and BIG 12 deteriorate with top football schools such as Florida State, Miami, and Oklahoma State look for greener monetary pastures. This could potentially prove disastrous for the toll it takes on program expenses (and student athlete health) because conferences were geographically clustered into regions - now schools like UCLA will fly to Brunswick, NJ to play Rutgers in the BIG 10. 
 
 
 ### Limitations
 
 Our paper based these projections still based on payouts and media from a 4 team playoffs structure. However, beginning in 2024, the College Football Playoffs will expand from 4 to 12 teams, bringing in an estimated additional 1.7 billion dollars annually (McCarthy, 2022). Additional analysis should be conducted to take this into account as this would greatly inflate projected revenues for all conferences that make it in. 
 
+Furthermore, the media deals that I've compiled are more nuanced - but I took yearly averages based upon a middle of the pack performing school. In reality, the media deal distribution is a little more uneven with so called "tier one" school games likely to take a larger share. 
+
 It's important to note that since we have teams from multiple years in the dataset, there poses a violation of independence between revenues from the same team but different years. Furthermore, the classifications of football teams into different categories was more subjective opinion based upon my opinions (one could argue that Oklahoma State is a "top" contender in the Big 12 over TCU). 
 
-
 ### Future Work: The Flip Side of the Balance Sheet
-We focused mainly on the revenue side of things - however, only a small fraction of all collegiate athletics programs are profitable. In 2019, only around 20% schools in the high grossing Football Bowl Subdivision (FBS) report a net positive operating margin (NCAA, 2019). Main expense items include 35% to administrative and coaches, 18% on athletic facilities, and 19% to student athletes themselves in the form of scholarships. Furthermore, some argue that the spending isn't even going into the right places. On the other side of the balance sheet, what can the spending patterns tell us about future projected spending across college football? Is the road to profitability more clear with these new conferences? 
 
+We focused mainly on the revenue side of things - however, only a small fraction of all collegiate athletics programs are profitable. In 2019, only around 20% schools in the high grossing Football Bowl Subdivision (FBS) report a net positive operating margin (NCAA, 2019). Main expense items include 35% to administrative and coaches, 18% on athletic facilities, and 19% to student athletes themselves in the form of scholarships. Furthermore, some argue that the spending isn't even going into the right places. On the other side of the balance sheet, what can the spending patterns tell us about future projected spending across college football? 
+
+After all, it's just college football, not a multi-million entertainment conglomerate ... right? 
 
 ## Appendix 
+
+### Appendix A
+
+```{r revenue dist, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(power5, aes(x=total_rev_menwomen)) + 
+  geom_histogram() +
+  labs(title = "Distribution of Power 5 School CFB Revenues",
+       x = "Total Revenue Across All Sources", y = "Number of Schools") +
+  theme_minimal()+
+  xlim(c(1.8e+07,8e+07))
+```
+
+```{r residuals, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot() + 
+  geom_point(aes(fitted(model), residuals(model))) +
+  ggtitle("Revenue Model:\nResiduals vs Fitted") +
+  xlab("Fitted values") + ylab("Residuals") +
+  geom_hline(yintercept = 0, col='red')
+```
+
+
 
 ### Works Cited
 

@@ -1,0 +1,5 @@
+"0","ggplot() + "
+"0","  geom_point(aes(fitted(model), residuals(model))) +"
+"0","  ggtitle(""Revenue Model:\n Residuals vs Fitted"") +"
+"0","  xlab(""Fitted values"") + ylab(""Residuals"") +"
+"0","  geom_hline(yintercept = 0, col='red')"

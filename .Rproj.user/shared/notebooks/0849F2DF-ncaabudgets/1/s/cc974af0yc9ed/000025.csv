@@ -10,4 +10,4 @@
 "0",""
 "0",""
 "0","kable(output, digits = 3, caption = ""College Football Revenue Regression Model"") %>%"
-"0","  kable_styling(latex_options = ""HOLD_position"", font_size=7)"
+"0","  kable_styling(latex_options = ""HOLD_position"", font_size=10)"

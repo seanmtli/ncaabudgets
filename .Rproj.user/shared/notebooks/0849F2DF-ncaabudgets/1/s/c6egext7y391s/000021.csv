@@ -1,0 +1,6 @@
+"0","ggplot(power5, aes(x=total_rev_menwomen)) + "
+"0","  geom_histogram() +"
+"0","  labs(title = ""Distribution of Power 5 School CFB Revenues"","
+"0","       x = ""Total Revenue Across All Sources"", y = ""Number of Schools"") +"
+"0","  theme_minimal()+"
+"0","  xlim(c(1.8e+07,8e+07))"

@@ -1,0 +1,2 @@
+"0","model <- lm(total_rev_menwomen ~ as.factor(sector_name) + total_exp_menwomen + ef_total_count + as.factor(fbcategory) + as.factor(conference), data = power5)"
+"0",""
