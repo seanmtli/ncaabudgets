@@ -1,0 +1,633 @@
+---
+title: "Exploring Differentitations in Lemur Gut Microbiome"
+author: "Group 7: Sean Li, David Han, Enzo Mescali, Mitchelle Mojekwu"
+output: pdf_document
+geometry: margin=2cm
+header-includes:
+  - \usepackage{amsmath}
+---
+
+```{r setup, include = FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libraries, warning = FALSE, include = FALSE, message = FALSE, echo=FALSE}
+library(pillar)
+library(plyr)
+library(dplyr)
+library(readr)
+library(stringr)
+library(janitor)
+library(tidyverse)
+library(gridExtra)
+library(tibble)
+library(ggplot2)
+library(lme4)
+library(lmerTest)
+library(knitr)
+library(broom)
+library(kableExtra)
+library(cowplot)
+library(glmmTMB)
+library(car)
+library(performance)
+```
+
+```{r readingdata, warning = FALSE, include = FALSE, message = FALSE, echo=FALSE}
+#reading data
+
+map_year1 <- read.delim("data/map_year1.txt", row.names=1, comment.char="#")
+#relab6 <- read_delim("data/relab6_mitch_edit.tsv", delim = "\t", escape_double = FALSE, trim_ws = TRUE)
+relab6 <- read.delim("data/relab6_mitch_edit.tsv", header=FALSE)
+
+#3 markers of alpha diversity
+richness <- read.delim("data/richness.tsv") %>% 
+  mutate(sampleID = X) %>% 
+  subset(select = -(X))
+evenness <- read.delim("data/evenness.tsv") %>% 
+  mutate(sampleID = X) %>% 
+  subset(select = -(X))
+faith_pd <- read.delim("data/faith_pd.tsv") %>% 
+  mutate(sampleID = X.SampleID) %>% 
+  subset(select = -(X.SampleID))
+```
+
+```{r datajoins, warning = FALSE, include = FALSE, message = FALSE,echo=FALSE}
+#data edits/joins (not including relab6)
+
+#remove sequencing data from map_year1 (BarcodeSequence-Plate)
+map_year1_1 <- subset(map_year1, select = -c(BarcodeSequence,LinkerPrimerSequence,BarcodePlate, Well, Plate))
+
+# joining 3 markers of alpha diversity
+markers <- join(richness, evenness, by = "sampleID" , type = "left", match = "all")
+markers<- join(markers,faith_pd, by = "sampleID", type = "left", match = "all")
+markers = markers %>% 
+  select(sampleID,observed_features,shannon_entropy,faith_pd)
+
+#join of markers to map_year1
+tab1 <- left_join(map_year1_1,markers, by = c("Description" = "sampleID"))
+
+#function to convert sample time to continuous decimal
+convert_time_to_float <- function(time_integer) {
+  hours <- time_integer %/% 100  # Extract hours
+  minutes <- time_integer %% 100  # Extract minutes
+  fractional_time <- hours + (minutes / 60)  # Convert to fractional time
+  return(fractional_time)
+}
+
+#edits to sample time and sample date
+bigTab1 <- tab1 %>% 
+  mutate(sampDate = as.Date(Sampling.date, format = "%d-%b-%y"),
+                            sampTime = convert_time_to_float(Sampline.time),
+                            sampTimeBin = floor(sampTime))
+```
+
+```{r relabfixing, warning = FALSE, include = FALSE, message = FALSE,echo=FALSE}
+#relab6 stuff
+
+#create family column
+relab6_f <-relab6
+colnames(relab6_f) <- relab6_f[1, ] 
+relab6_f<- relab6_f[-1, ]
+pattern <- ".*;f__(.*);" 
+fam <- str_match(relab6_f$OTU_ID, pattern)
+relab6_f$family <- fam[, 2]
+rownames(relab6_f) <- relab6_f$OTU_ID
+relab6_f1 <- relab6_f[, -1]
+relab6_f2 <- relab6_f1[complete.cases(relab6_f1$family), ]
+relab6_f2[, 1:293] <- apply(relab6_f2[, 1:293], 2, as.numeric)
+
+
+#top 3 families by summing abundance proportions amongs all samples for each family
+relab6_f2$sums<-rowSums(relab6_f2[,1:293],na.rm=TRUE)
+top_3 <-relab6_f2 %>% 
+  group_by(family) %>% 
+  dplyr::summarise(s = sum(sums)) %>% 
+  arrange(desc(s)) %>% 
+  top_n(3)
+
+#grouping proportions by top 3 families for each fecal sample
+relab6_gbf = relab6_f2 %>%
+  group_by(family) %>%
+  filter(family %in% top_3$family) %>% 
+  summarize_all(.funs = sum, na.rm = TRUE)
+
+#prepping grouped proportions for joining onto large table
+relab6_gbf_t <- t(relab6_gbf)
+colnames(relab6_gbf_t) <- as.character(unlist(relab6_gbf_t[1, ]))
+relab6_gbf_t <- relab6_gbf_t[-1, ]
+relab6_gbf_t <- data.frame(relab6_gbf_t) %>%
+  mutate_all(as.numeric)
+
+#joining top 3 family proportions onto big table
+rownames(bigTab1) <- bigTab1$Description
+bigTab2 <- merge(bigTab1, relab6_gbf_t, by = "row.names")
+```
+
+## Introduction
+
+### Context and Background
+
+Lemur evolution in Madagascar fascinates evolutionary ecologists due to migration, isolation, and adaptation. The journey from mainland Africa to Madagascar likely involved ocean crossings on debris or vegetation rafts. After arrival, lemurs diversified into over 100 species with unique traits, aiding their survival in varied ecosystems (Longrich, 2021). The gut microbiome of lemurs is a key focus in evolutionary and ecological studies, shedding light on evolution, diet, and ecosystem dynamic which mirrors the host's health, physiology, and behavior. Research in humans and other organisms has highlighted the gut microbiome's influence on processes like nutrient absorption, immune responses, and behavior (Cresci & Bawden, 2015).
+
+The ring-tailed lemurs (Lemur catta) and sifakas (Propithecus spp.), are the two species the Duke Lemur Center has focused on. The ring-tailedlemur's gut microbiome is very different than the Sifaka as the ring-tailed lemur is an an omnivore while the Sifaka is a folivore. Previous research explored diet and social interactions in shaping lemur gut microbiomes but understanding the influence of time of day or season remains incomplete. This study aims to address this gap by analyzing fecal sample bacteria to explore gut microbiome diversity in these lemur species (Campbel et al., 2000; Donohue et al., 2022).
+
+There are 3 main objectives for this study.
+
+1)  Is there any pattern in gut microbiome patterns due to the time of day?
+
+2)  How much variation do we see within and between days and seasons?
+
+3)  Do any potential differences themselves differ between ring-tailed lemurs and sifakas that have very different gastrointestinal systems?
+
+Answering these questions will help researchers better understand the nuances of gut microbiome diversity among an important group of animals, particularly furthering a distinction between captive ring-tailedand sifakas lemur behaviors or bowel movements based on time or season.
+
+### The Data
+
+Dr. Lydia Greene collected gut microbiome data regarding diversity and taxonomic membership in fecal samples among ring-tailed lemurs and sifakas. She collected data by following lemurs (6 ringtails and 6 sifakas) 6:20 am - 6:10 pm from May through June and August through September. Dr. Greene followed the lemurs in same-species pairs, with 3 consecutive days of data per lemur pair of observation. Overall, there were a total of 293 fecal samples collected. Other important information related to the collection of data is that there were 3 forest enclosures, with a pair of each breed in each enclosure. The bacterial gDNA from the samples was extracted using two types of kits which were able to obtain important markers of microbial diversity information on the gut microbiomes based on a fecal sample.
+
+Through her observations and extractions, she produced data on the fecal sample level. The metadata includes observational and identification data such as species, grouping, individual lemur ID, sample time, sample day, season, and kit. The microbiome biodiversity data includes three markers: Richness/Observed Features, the number of microbial taxa per sample; Shannon Index, the microbial evenness per sample; and Faith's Phylogenetic Diversity: the phylogenetic breadth per sample. Lastly, Dr. Greene produced a data set of the relative abundance of each microbial genus per fecal sample.
+
+The independent variables (used as predictors) are as follows: Enclosure, sampling date, sampling time, kit type, individual lemur ID, season, species, and social group.
+
+The dependent variables (used as responses) are as follows: Richness and faith's phylogenetic diversity.
+
+We are also considering the abundance of bacterial microbes as a dependent variable. Due to the high dimensional nature of this data, we transformed it as discussed in the methodology section. A full definition of all variables can be found in the appendix.
+
+### EDA
+
+We noted the presence of repeated measurements for each individual lemur taken simultaneously at the same time, potentially challenging the assumption of independence. The distribution is relatively bimodal with fewer fecal samples collected around 6 am, 11 am-2 pm, and 6 pm.(Appendix: Image 1) We also explored the distribution and spread of the three biodiversity markers and found that the markers have significantly different ranges and that richness has a much higher variability than the other markers (Appendix: Image 5 & 6). We also looked at time plots of the 3 markers over time by species. For richness, we see no clear pattern from 6 am to 6 pm, with a wide variety of richness levels at every hour. The variance does decrease however, as the number of sample sizes also goes down from 12pm to 2pm. There appears to be higher marker metrics and more variance in richness across time of day for the Ring-tailed lemur (L.Catta) than the Sifakas (P. Coquereli). A similar situation applies to the Shannon Index and Faith's Phylogenetic Diversity as well (Appendix: Image 2).
+
+## Figure 1. Diversity Metrics Throughout the Day
+
+```{r img1a, fig.height=2.5, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(data = bigTab1, aes(x = sampTime, y = observed_features, col = species)) + geom_point(size = 1) + labs(title ="Richness/Observed Features Over Time", subtitle = "by Lemur Species", x = "Sample Time", y = "Richness/Observed Features") 
+```
+
+When accounting for species, group, and individual lemur, there don't tend to be noticeable trends over time. However, the L. Catta species has a wider range for all the markers which explains the larger variances previously calculated. Also, the markers tend to differ by social group but not as much on the individual lemur level (Appendix: Image 7). We approached the research question two by first visualizing the distribution of fecal sample observation over the days sampled. The distribution of fecal samples by day shows that the number of samples varies by day and some lemurs provided fecal samples on certain days, due to the fact that they weren't all followed throughout the life cycle of the project simultaneously (Appendix: Image 3). Next, we visualized the relationship between sample date and markers based on species. Higher ranges of biodiversity metrics appear on certain days, particularly when L. Catta (ring-tailed) lemurs provided fecal samples. Even within species, the markers somewhat differ by day (and even a bit by season for the richness of L.Catta fecal samples) (Appendix: Image 4)
+
+## Figure 2. Diversity Metrics by Sample Date
+
+```{r img4a, fig.height=2.5, fig.width=7,message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(bigTab1, aes(x = sampDate, y = observed_features, color = species)) + geom_point(size = 1) + labs(title = "Richness/Observed Features by Sample Date", subtitle = "by Lemur Species", x = "Sample Date", y="Observed Features")
+```
+
+But when visualizing biodiversity markers over sample date by social groups within a species and by individual lemurs within social groups, there isn't a significant difference in the markers by days/season. The differences in biodiversity markers seem to be associated with the difference in species and social groups (Appendix: Image 8).
+
+EDA was also performed on the top three most abundant bacteria families. The prevalence of the first two most abundant families, Lachnospiraceae and Oscillospiraceae, is higher in P. Coquereli (sifakas) lemurs than L.Catta (ring-tailed lemurs). However, for Prevotellaceae, P. Coquereli exhibits a higher abundance (Appendex: Image 10). When examining the relationship between sample time and the bacteria families, no visible association is observed (Apendix: Image 11). When examining the relationship between sample date and the families, higher proportions are observed on some days, especially when certain species were observed (Appendix: Image 12).
+
+## Methodology
+
+### Dual Approach: Bacteria Level and Diversity Metric Level
+
+Our analysis is split into diversity metric level and bacterial family level. The diversity level encompasses response variables of Faith's phylogenetic diversity and richness, while bacteria level targets the top 3 most prevalent taxa at the family level.
+
+To assess bacterial difference in lemur gut microbiomes we looked to model fluctuations in the makeup of the gut microbiomes across stool samples. Due to the unwieldy nature of using the proportions of all bacteria species as a 206-dimensional predictor variabl, the choice was made to aggregate the species by their respective families and compute the percentage of bacteria in each stool sample per family. Out of the 79 families, we further simplified and focused on the three most common. To determine this, we identified the families with the highest bacteria percentages across the samples, correcting for sampling inequality by undersampling from lemur groups with higher sample counts. Species that did not have family level data were omitted, there were very few of them and they did only accounted for a small percentage of any one sample. The gap between the third most prevalent family, Oscillospiraceae, (about 26% of all bacteria) and the fourth family, Ruminococcaceae, (about 18%) is larger than the following differences. Thus, we used the elbow method to select the top three families. Notably, Prevotellaceae, the second most common family, has a higher prevalence in the L. Catta samples than in the P. coquereli samples and is the fourth most common family when only considering from P. coquereli samples, which is reflected in the models.
+
+We decided to solely focus on modeling richness and Faith's phylogenetic diversity and cut out Shannon Entropy. The formula for Shannon Entropy is $-\sum_{i=0}^n p(x_i) \log p(x_i)$ where $p(x_i)$ is the percentage of a species in a community. The $-xlogx$ function increases from the origin to a global maximum at around $(0.37, 0.16)$. Since we are using the most prevalent families as predictors and their prevalence percentages lie closest 37%, we decided to not use Shannon Entropy and focus on the two other diversity metrics.
+
+### Hierarchical Linear Mixed Model
+
+We approach the questions by creating a hierarchical linear mixed model to investigate the relationship and effect of time and season with our measures of diversity and bacteria family prevalence. Our choice was made to maintain the interpretability of linear regression and to use random effects to account for the potential violations of independence due to repeated sampling from the same groups of lemurs and individual lemurs. This arises from the non-independence between fecal samples from the same lemur, and the lemurs in their groups may have similar eating habits and diets. The hierarchical model accounts for this structure of group \> individual, allowing each of their coefficients to be identifiable. We did not have species in the nested random effects because there were only two species studied, so we instead put interaction terms with time of day and season.
+
+Other models were considered, however we decided that those choices were not as suitable. For example, we thought about using GEE to specify the working correlation structure, allowing us to describe the way repeated measurements on the same subject are correlated. However, GEE gives population-averaged effects, which is more applicable in situations where we want to understand an overall effect of a changed variable on a population. We would rather understand individual variability and random effects -- so we stuck with a mixed effects model. Furthermore, for the diversity metrics we opted to stick with an identity link and gaussian linear mixed model as our response variables are continuous and approximately normally distributed.
+
+For the bacteria family models we opted to go with a generalized linear mixed model utilizing beta regression with a logit link, since the range of the response is [0,1] and we are modeling a proportion (Ferrari, 2004). Otherwise, the two models hold the same predictors, random terms, and interaction effects.
+
+Below is a complete mathematical representation of the models:
+
+```{=tex}
+\begin{equation*}
+\begin{aligned}
+g(y_{ijk}) &= \beta_{0jk} + \beta_{1jk} \times \text{timeofday}_{ijk} + \beta_{2jk} \times \text{species}_{ijk} \\
+&\quad + \beta_{3jk} \times \text{timeofday}_{ijk} \times \text{species}_{ijk} \\
+&\quad + \beta_{4jk} \times \text{season}_{ijk} + \beta_{5jk} \times \text{season}_{ijk} \times \text{species}_{ijk} \\
+&\quad + \beta_{6jk} \times \text{kit} ~ (+ \epsilon_{ijk} \text{ included in diversity metric models}) \\
+&\beta_{0jk} = \gamma_{000} + u_{0jk} \\& u_{0jk} = \alpha_{k} + \mu_{jk} \\
+& \alpha_k \sim N(0, \sigma_{k|j}), u_{0jk} \sim N(0, \sigma_j), (\epsilon_{ijk} \sim N(0, \sigma))
+\end{aligned}
+\end{equation*}
+```
+Where: $g()$ is the link function, which is the identity function for diversity metrics and the logit function for the bacterial family models $y_ijk$ is the diversity metric value or bacterial family prevalence for the k-th fecal sample from the j-th animal in the i-th group. Fixed effect coefficients: $\beta_0$ is the intercept, $\beta_1$ for hours since 6am, $\beta_2$ for species, $\beta_3$ for interaction between hours since 6am and species, $\beta_4$ for season, $\beta_5$ for interaction between season and species, $\beta_6$ for kit. Random effects: $b_1(\text{Group}_i)$ is the random intercept for the i-th group and $b_2(\text{Group}_i) \times \text{Lemur}_{j[i]}$ is the random intercept for the j-th lemur nested within the i-th group. Note that every other $\beta$ has no random effect associated to it.
+
+Finally, $\epsilon_{ij}$ represents the residual error for the j-th animal in the i-th group and is only included in the diversity metric models.
+
+We made a total of 5 models in this format: 2 for diversity metrics Faith's P.D. and Richness, and 3 for each of the top family level bacteria that were prevalent.
+
+Our assumptions to use the diversity model are as follows: linearity, independence of observations, homoscedasticity, normality, no significant multi-collinearity. The assumptions for the beta regression are a subset of these plus the appropriateness of the link function. We have the full diagnostics and evaluation of model assumptions in our appendix. (Appendix: Images 14-23)
+
+### How we tackled specific goals
+
+To answer if there is any pattern in gut microbiome patterns due to the time of day, we dissect the data at multiple levels: descriptive statistics, visualizations, and model coefficients. By interpreting the coefficients of the model for time of day and the interaction effects, we can answer if there is any pattern in gut microbiome patterns due to the time of day. For the 2nd question, we combine our findings from a histogram of the diversity measures with the variance components analysis from our linear mixed model to understand the variability of gut microbiomes between and within days and seasons.
+
+For the 2nd question, we combine our findings from EDA of diversity measures and bacterial families with season and date predictor variable analysis from our linear mixed model to understand the variability of gut microbiomes between and within days and seasons. There are 4 specific sub-questions at hand here: within-day variability, between-day variability, within-season variability, and between-season variability.
+
+We tackled this 3rd research question with similar exploratory data analysis as done in questions 1 and 2. Images 2 and 4 displays potential differences in the two lemur species in biomarkers over sample time, sample dates, and seasons.Then we examined and interpreted the interaction effects between species and season and time of day respectively. This allows us to gain insight to the differences in the differences on the species level.
+
+## Results
+
+### Interpretations of Our Models
+
+```{r diversity metric models, warning = FALSE, message=FALSE, echo=FALSE}
+rownames = c("(Intercept)", "Hours since 6am", "Species (P. coquereli)", "Season (summer)", "Kit (Pro)", "Hours since 6am: Species (P. coq.)", "Season (summer):Species (P. coq.)")
+
+rich_model = lmer(observed_features ~ sampTime*species + season*species + kit + (1|Group/Animal.ID), data = bigTab2)
+
+output = summary(rich_model)$coeff
+rownames(output) = rownames
+
+kable(output, digits = 3, caption = "Richness Coefficients/Summary Stats") %>%
+ kable_styling(latex_options = "HOLD_position", font_size=7)
+
+
+faith_model = lmer(faith_pd  ~ sampTime*species + season*species + kit + (1|Group/Animal.ID), data = bigTab2)
+
+output = summary(faith_model)$coeff
+rownames(output) = rownames
+
+kable(output, digits = 3, caption = "Faith's P.D. Coefficients/Summary Stats") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+The diversity level models showed that the richness and Faith's P.D. differed significantly between the two seasons (richness: t=7.058, p=1.31e-11, Faith's P.D.: t=7.065, p=1.29e-11). Holding all fixed and random effects constant, we see that season changing from spring to summer is positively correlated with both an increase in the number of microbial taxa and phylogenetic breadth in a fecal sample. The models suggest that on average for fecal samples in the summer have a higher richness by 31.388 units and higher Faith's PD by 1.188 units than samples in the spring, holding all fixed and random effects constant. Compared to ring-tailed lemurs Sifakas fecal samples from spring to summer have on average, a decrease of 24 units in the richness of their gut microbiome, holding all fixed and random effects constant. This significant interaction suggests that the effect of moving from spring to summer differs between the two lemur species. A similar effect is found for Faith PD.
+
+See appendix (Tables 6 & 7) for random effect spread statistics.
+
+```{r l_model, message=FALSE, warning=FALSE, echo=FALSE}
+l_model = glmmTMB(Lachnospiraceae  ~ sampTime*species + season*species + kit + (1|Group/Animal.ID), data = bigTab2, family = list(family="beta",link="logit"))
+
+output = summary(l_model)$coeff$cond
+rownames(output) = rownames
+
+kable(output, digits = 3, caption = "Lachnospiraceae Coefficients/Summary Stats") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+```{r o_model, message=FALSE, warning=FALSE, echo=FALSE}
+o_model = glmmTMB(Oscillospiraceae  ~ sampTime*species + season*species + kit + (1|Group/Animal.ID), data = bigTab2, family = list(family="beta",link="logit"))
+
+output = summary(o_model)$coeff$cond
+rownames(output) = rownames
+
+kable(output, digits = 3, caption = "Oscillospiraceae Coefficients/Summary Stats") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+```{r p_model, message=FALSE, warning=FALSE, echo=FALSE}
+p_model = glmmTMB(Prevotellaceae  ~ sampTime*species + season*species + kit + (1|Group/Animal.ID), data = bigTab2, family = list(family="beta",link="logit"))
+
+output = summary(p_model)$coeff$cond
+rownames(output) = rownames
+
+kable(output, digits = 3, caption = "Prevotellaceae Coefficients/Summary Stats")  %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+From the statistically significant variables, we may determine:
+
+If the stool sample is from a P. Coquereli lemur instead of L. catta, the log of the ratio of the amount of bacteria in the Lachnospiracae family relative to the amount of bacteria in other families is expected to increase by about 0.65, holding all other fixed and random effects constant. Similarly, if the stool sample is taken during the summer instead of the spring, the log of the ratio of the amount of bacteria in the Lachnospiracae family relative to the amount of bacteria in other families is expected to increase by about 0.12, holding all other variables constant. These two variables also hold an interaction effect: specifically when both the season is summer and the stool sample is from a P. coquereli lemur, he log of the ratio of the amount of bacteria in the Lachnospiracae family relative to the amount of bacteria in other families is expected to decrease by about -0.40, holding all other variables constant.
+
+The model on Oscillospiraceae prevalence indicates that for every hour that goes by past 6am, the log of the ratio of the amount of bacteria in the Oscillospiraceae family relative to the amount of bacteria in other families in a stool sample is estimated to decrease by about 0.02, holding all other variables constant. Similarly, the seasonal effect of whether a stool sample is taken during the summer instead of the spring, the log of the ratio of the amount of bacteria in the Oscillospiraceae family relative to the amount of bacteria in other families is expected to increase by about 0.22, holding all other variables constant. Furthermore, if the stool sample is from a P. cooquereli lemur instead of L. catta, the log of the ratio of the amount of bacteria in the Oscillospiraceae family relative to the amount of bacteria in other families is expected to increase by about 0.42, holding all other variables constant. Notably, the interaction effects between species and time of day, and species and season are both not statistically significant, thus we cannot conclude whether or not there is an effect.
+
+If the stool sample is from a P. cooquereli lemur instead of L. catta, the log of the ratio of the amount of bacteria in the Prevotellaceae family relative to the amount of bacteria in other families is expected to decrease by about 1.05, holding all other variables constant. Similarly, if the stool sample is taken during the summer instead of the spring, the log of the ratio of the amount of bacteria in the Prevotellaceae family relative to the amount of bacteria in other families is expected to decrease by about 0.10, holding all other variables constant. These two variables also hold an interaction effect, but it is not statistically significant and we fail to determine whether or not there is an interaction between lemur species and season that has a relationship with the prevalence of Prevotellaceae bacteria in lemur stool samples.
+
+### A quick exploration of variance
+
+```{r within-variances, warning=FALSE, echo=FALSE, message=FALSE}
+within_day_variance <- bigTab2 %>%
+  group_by(sampDate) %>%
+  summarise(varRich = var(richness), varFaith = var(faith_pd))
+within_season_variance <- bigTab2 %>%
+  group_by(season) %>%
+  summarise(varRich = var(richness), varFaith = var(faith_pd))
+#within_day_variance <- drop_na(within_day_variance)
+#within_day_variance
+#within_season_variance
+```
+
+```{r between variances, warning=FALSE, echo=FALSE, message=FALSE}
+between_day_variance <- bigTab1 %>%
+  group_by(sampDate) %>%
+  summarise( meanRich = mean(richness), meanFaith = mean(faith_pd))
+between_season_variance <- bigTab1 %>%
+  group_by(season) %>%
+  summarise( meanRich = mean(richness), meanFaith = mean(faith_pd))
+#var(between_day_variance$meanRich)
+#var(between_day_variance$meanFaith)
+#var(between_season_variance$meanRich)
+#var(between_season_variance$meanFaith)
+```
+
+Performing one-way ANOVA, between days, we have 525.3 and 3.404 variance for Richness, and Faith's PD respectively. Between seasons, we have 223.37 and 0.46, variance for Richness, and Faith's PD respectively. Within days, the richness variance is 632.163 and Faith's phylogenetic diversity variance is 0.9142. Within seasons, the variance for spring is 884.12 and 1042 for richness, and 3.74 and 3.88 for Faith's P.D. We have p-values below 0.05 for both models.
+
+## Discusssion
+
+### Research Question 1: Time of Day Differences
+
+A brief analysis of the EDA shows that for richness there appears to be more variance in richness across time of day for the Ring-tailed lemur (L.Catta) than the Sifakas (P. Coquereli). However, for Faith's PD, we see that Sifakas generally have lower values across the different times of the day compared to the ring-tailed lemurs. Looking at our diversity metric models, the coefficient for time of day is not significant at the predetermined $\alpha>0.05$ level for richness and Faith's phylogenetic diversity. This is not statistically significant and thus further studies or different experimental designs may be required to conclusively rule out any potential effects. Through the bacteria family analysis, it is evident that there is a relationship between the time of day a stool sample is collected and the prevalence of Oscillospiraceae family bacteria. As previously stated, the ratio of the amount of bacteria in the Oscillospiraceae family relative to the amount of bacteria in other families in a stool sample is estimated to decrease by about 2.2% per hour past in the day since 6am, holding all other fixed and random effects constant. The other two bacteria families, however, were not shown to have any statistically significant relationship with time of day in our model.
+
+### Research Question 2: Variability Between + Within Days, Seasons
+
+We found that there was higher variability of the two diversity metrics within days as compared to between days. This suggests that the microbial diversity in the lemur gut is more influenced by daily events such as meals or stressors than longer-term factors such as dietary changes or medication. For scientists aiming to sample the gut microbiome, it might be advisable to take multiple samples throughout the day. These findings pave the way for more detailed temporal studies to understand the specific factors driving these variability patterns. We did not examine the variability between/within days and seasonx at the bacteria level as we felt it the granularity would be too sparse to give a practical insight.
+
+### Research Question 3: Species Level Differences
+
+Visualizations indicate an association between lemur species and gut microbiome makeup. Not only do L. Catta lemurs have a wider range of markers, the markers also tend to be higher. (Images 2 & 4) This is also seen in the variance statistics by species. As mentioned in the EDA L. Catta has a higher variance for all biodiversity markers, meaning those lemurs' biodiversity metrics are likely to be more sensitive to predictors. (Appendix: Image 6) This can likely be because they have more generalized diets than the L. Coquerelli species which are strictly folivores. Also when considering EDA for the top three most abundant bacteria families, the family abundance differs by species. (Appendix: Image 10-12)
+
+Considering the diversity metric models, seasonal interaction is a significant predictor in both the richness and Faith's P.D. models. According to the model, on average richness increases by 7 units in the summer for P. Coquereli lemurs, but 31 units for L. Catta lemurs, holding all other fixed and random effects constant. This signifies that the effect of season on biodiversity is not only of a greater magnitude in the L. Catta case, but is conclusive that the 'difference of the difference' in biodiversity exists between the species. Regarding the bacteria family models, only Lachnospiraceae showed a statistically significant relationship with the season and species interaction term, showing a summertime reduction in Lachnospiraceae prevalence for P. Coquereli lemurs but an increase for L. Catta lemurs.
+
+### Methodology Evaluation
+
+The hierarchical mixed model was suitable for analyzing time-of-day patterns and variability due to its ability to account for repeated measures on lemurs. For comparing different lemur species, the fixed effects in the model can highlight these differences while considering within-species variability. Here are two alternative techniques that could have been useful. Generalized Additive Mixed Models (GAMMs): Useful if non-linear relationships exist between time and microbiome patterns.Bayesian Hierarchical Models: A Bayesian approach may offer more direct insights, especially with challenging model assumptions or limited data.
+
+### Limitations
+
+Potential threats to the validity of our analysis include sampling bias, as microbiome composition might differ by sample collection time. Seasonal or environmental changes during sampling could introduce extraneous variability, especially if different lemur groups were sampled under diverse conditions. The study's reliance on higher taxonomic levels (family level) and limitation to three families, rather than detailed microbial identification, may mask fine-scale microbiome variations. Our interpretations are also constrained by the limited lemur-specific microbial literature. The omission of influential factors, such as natural habitat enclosure, could lead to biases, while the inclusion of multiple fixed effects raises concerns about multicollinearity, potentially muddling true relationships.
+
+Though the data was collected recently in a patterned manner by an experienced researcher some limitations come with having only one person collect the data. Only certain lemur social groups of the same species were observed on certain days. This process does not grant real data of samples for each day by species, social group, and individual lemur. Though we account for these predictors in our model the data is not fully representative of the combinations of fecal samples over every day of fecal collection. The data has a good amount of fecal samples to conclude from but it is only representative of 12 lemurs total (6 from each species) and there is an association with biodiversity and social groups which limits the possibility of applying the data to a great population. The data also only covers Spring and Summer which limits the capability of applying our findings to a more broader seasonal context. Given that the data was also collected of lemurs in forest enclosures, it is not likely that the data is representative of the general population of Madagascar lemurs who possibly have access to a different amount and types of food options and less patterned eating. Lemurs in Madagascar also cohabitate with other species which may impact their diet.
+
+### Implications and Conclusion
+
+The study has shown clear seasonal differences in the gut microbiomes of the sampled lemurs, and shown that there is evidence that the differences in seasons are of a different magnitude depending on the lemur species. Regarding the time of day, the study is inconclusive, with only 1 bacteria group showing differences. Lastly, the study has shown there is a difference in the relationship between biodiversity metrics and predictors when interacting with the different species. Given the opportunity to approach the study differently, we'd consider lemur profile data beyond species. Factors such as age, weight, gender, and amount of years in enclosure may also impact metrics of biodiversity over time. We'd also consider incorporating a simultaneous individual lemur fecal collection of more lemurs to allow us to draw stronger inferences in the interactions of sample date and species. Overall this study provides insight into the biological and dietary traits of two prominent and distinct lemurs over metrics of time. The findings in this study can be applied to better understand the current ecology of lemurs.
+
+\pagebreak
+
+## Appendix
+
+### Works Cited
+
+Cresci, G., & Bawden, E. (2015). Gut microbiome. Nutrition in Clinical Practice, 30(6), 734--746. <https://doi.org/10.1177/0884533615609899>
+
+Donohue, M.E., Rowe, A.K., Kowalewski, E. et al. Significant effects of host dietary guild and phylogeny in wild lemur gut microbiomes. ISME COMMUN. 2, 33 (2022). <https://doi.org/10.1038/s43705-022-00115-6>
+
+Ferrari, SILVIA L.P. "Beta Regression for Modelling Rates and Proportions - IME-USP." IME-USP, Universidade de Sao Paulo, 2004, www.ime.usp.br/\~sferrari/beta.pdf.
+
+Longrich, "Improbable Voyages- Did an Ancient Ocean Crossing Give Rise to African Primates- and Humans?", 10 Sept. 2021, www.nicklongrich.com/blog/improbable-voyages-did-an-ocean-crossing-give-rise-to-african-primates-and-humans.
+
+\pagebreak
+
+### Variable Descriptions
+
+NHE: The enclosure that the lemur sample was collected in. Animal ID: The specific lemur that the fecal sample came from. The name is recorded down. Group: Social group of the lemur, captained by the dominant female of the pairing. Species: the type of lemur (ring-tail or sifakas). Kit: The variant of the sampling toolkit used to collect that sample (there were two types, powersoil pro and powersoil). Sampling Date: The date of collection for the fecal sample. Sampling Time: The time of day the fecal sample was collected given in military time. Season: May - June is considered spring while August through September is considered summer. Richness: number of microbial taxa per sample (12 taxa types) Shannon's Index: microbial evenness per sample Faith's Phylogenetic Diversity: phylogenetic breadth per sample \pagebreak
+
+```{r img1, fig.height=3, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+#distribution of poop over time (some lemurs poop more than others at different times)
+ggplot(bigTab2, aes(x = sampTime)) +
+  geom_histogram(aes(fill = Animal.ID)) + labs(title = "1) Distribution of Fecal Samples Overtime",subtitle = "by Individual Lemur",x = "Sample Time", y = "Count", fill = "Lemur Names")
+```
+
+```{r img2, fig.height=3, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+a1 <-ggplot(data = bigTab1, aes(x = sampTime, y = shannon_entropy, col = species )) +geom_point()+ labs(title ="2) Shannon Index Overtime", subtitle = "by Lemur Species", x = "Sample Time", y = "Shannon Index") 
+a2<- ggplot(data = bigTab1, aes(x = sampTime, y = faith_pd, col = species)) +geom_point()+ labs(title ="Faith's P.D. Overtime", subtitle = "by Lemur Species", x = "Sample Time", y = "Faith's P.D.")
+plot_grid(a1, a2, ncol=2)
+```
+
+\pagebreak
+
+```{r img3, fig.height=3, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(bigTab2, aes(x = sampDate)) +
+  geom_histogram(aes(fill = Animal.ID)) + 
+  labs(title = "3) Distribution of Fecal Samples By Sample Date",
+       subtitle = "by Individual Lemur", x = "Sample Date", y = "Count", fill = "Lemur Names")
+```
+
+```{r img4, fig.height=3, fig.width=7, message=FALSE, warning=FALSE, echo=FALSE}
+b1 <- ggplot(bigTab1, aes(x = sampDate, y = shannon_entropy, color = species)) + geom_point() + labs(title = "4) Shannon Index by Sample Date", subtitle = "by Lemur Species",x = "Sample Date", y="Shannon Index")
+b2 <- ggplot(bigTab1, aes(x = sampDate, y = faith_pd, color = species)) + geom_point()  + labs(title = "Faith's P.D. by Sample Date", subtitle = "by Lemur Species", x = "Sample Date", y="Faith's P.D.")
+plot_grid(b1, b2, ncol=2)
+```
+
+\pagebreak
+
+```{r img5, warning = FALSE, message = FALSE, echo=FALSE}
+d1 <- ggplot(bigTab2, aes(x = observed_features)) +geom_histogram() + labs(title = "5) Distribution of\n Richness/Observed Features",x = "Richness/Observed Features", y = "Count")
+d2 <- ggplot(bigTab2, aes(x = shannon_entropy)) +geom_histogram() + labs(title = "Distribution of Shannon Index",x = "Shannon Index", y = "Count")
+d3 <- ggplot(bigTab2, aes(x = faith_pd)) +geom_histogram() + labs(title = "Distribution of Faiths Phylogenetic Diversity",x = "Faiths Phylogenetic Diversity", y = "Count")
+plot_grid(d1, d2, d3, ncol=2)
+```
+
+\pagebreak
+
+```{r, warning = FALSE, message = FALSE, echo=FALSE}
+kable(summary(rich_model)$varcor, digits=3,caption = "Richness Spread") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+
+kable(summary(faith_model)$varcor, digits=3,caption = "Faith's P.D. Spread") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+```{r img6, warning = FALSE, message = FALSE, echo=FALSE}
+#var of Richness/Observed Features
+rich_var <- bigTab2 %>% 
+  group_by(species) %>% 
+  dplyr::summarise(var(observed_features))
+kable(rich_var, digits=3, caption = "Variance of Richness/Observed Features") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+
+#var of Shannon Index
+shannon_var <- bigTab2 %>% 
+  group_by(species) %>% 
+  dplyr::summarise(var(shannon_entropy))
+kable(shannon_var, digits=3, caption = "Variance of Shannon Index") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+
+#var of Faith's P.D.
+faith_var <- bigTab2 %>% 
+  group_by(species) %>% 
+  dplyr::summarise(var(faith_pd))
+kable(faith_var, digits=3, caption = "Variance of Faith's P.D.") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+\pagebreak
+
+```{r img7, warning = FALSE, message = FALSE, echo=FALSE}
+ggplot(data = bigTab1, aes(x = sampTime, y = observed_features, col = Animal.ID)) + geom_point()+ geom_line()+ 
+  facet_wrap(~ Group + species, ncol = 3) + 
+  labs(title ="7) Richness/Observed Features Overtime", subtitle="by Species, Group, & Lemur",x = "Sample Time (in hours)", y = "Richness/Observed Features", color = "Individual Lemur") +
+  theme_minimal() 
+
+ggplot(data = bigTab1, aes(x = sampTime, y = shannon_entropy, col = Animal.ID)) + geom_point()+ geom_line()+ 
+  facet_wrap(~ Group + species, ncol = 3) + 
+  labs(title ="Shannon Index Overtime", subtitle="by Species, Group, & Lemur",x = "Sample Time (in hours)", y = "Shannon Index", color = "Individual Lemur") +
+  theme_minimal() 
+
+ggplot(data = bigTab1, aes(x = sampTime, y = faith_pd, col = Animal.ID)) + geom_point()+ geom_line()+ 
+  facet_wrap(~ Group + species, ncol = 3) +  # Facet by lemur group and species
+  labs(title ="Faiths Phylogenetic Diversity Overtime", subtitle="by Species, Group, & Lemur",x = "Sample Time (in hours)", y = "Faiths Phylogenetic Diversity", color = "Individual Lemur") +
+  theme_minimal() 
+```
+
+```{r img8, warning = FALSE, message = FALSE,echo=FALSE}
+ggplot(bigTab1, aes(x = sampDate, y = observed_features, group = Animal.ID, color = Animal.ID)) +
+  geom_point() +
+  facet_wrap(~ Group + species, ncol = 3) +
+  labs(title ="8) Richness/Observed Features by Sample Date", subtitle="by Species, Group, & Lemur",x = "Sample Date", y = "Richness/Observed Features", color = "Individual Lemur") +
+  theme_minimal()
+
+ggplot(bigTab1, aes(x = sampDate, y = shannon_entropy, group = Animal.ID, color = Animal.ID)) +
+  geom_point() +
+  facet_wrap(~ Group + species, ncol = 3) +
+  labs(title ="Shannon Index by Sample Date", subtitle="by Species, Group, & Lemur",x = "Sample Date", y = "Shannon Index", color = "Individual Lemur") +
+  theme_minimal()
+
+ggplot(bigTab1, aes(x = sampDate, y = faith_pd, group = Animal.ID, color = Animal.ID)) +
+  geom_point() +
+  facet_wrap(~ Group + species, ncol = 3) + 
+  labs(title ="Faiths Phylogenetic Diversity by Sample Date", subtitle="by Species, Group, & Lemur",x = "Sample Date", y = "Faiths Phylogenetic Diversity", color = "Individual Lemur") +
+  theme_minimal()
+```
+
+```{r img9, warning = FALSE, message = FALSE, echo=FALSE}
+ggplot(data=bigTab1, aes(x=observed_features, group=Animal.ID, fill=Group)) +
+    geom_density(adjust=1.5,alpha = 0.3) + labs(title = '9) Density of\n Richness/Observed Features', subtitle = 'by Group and Individual Lemur', x = 'Richness/Observed Features', y = 'Density')+facet_wrap(~Group) 
+
+ggplot(data=bigTab1, aes(x=shannon_entropy, group=Animal.ID, fill=Group)) +
+    geom_density(adjust=1.5, alpha = 0.3) +
+    facet_wrap(~Group)+ labs(title = 'Density of Shannon Index', subtitle = 'by Group and Individual Lemur', x = 'Shannon Index', y = 'Density')
+ggplot(data=bigTab1, aes(x=faith_pd, group=Animal.ID, fill=Group)) +
+    geom_density(adjust=1.5,alpha = 0.3) +
+    facet_wrap(~Group) + labs(title = 'Density of Faiths Phylogenetic Diversity', subtitle = 'by Group and Individual Lemur', x = 'Faiths Phylogenetic Diversity', y = 'Density')
+```
+
+```{r img10, warning = FALSE, message = FALSE, echo=FALSE }
+c1 <- ggplot(bigTab2, aes(x = species, y =  as.numeric(Lachnospiraceae))) + 
+  geom_boxplot()+ scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.10)) + labs(title = "10)\nLachnospiraceae", subtitle = "by Species", x = 'Species',y = 'Lachnospiraceae')
+c2 <- ggplot(bigTab2, aes(x = species, y =  as.numeric(Oscillospiraceae))) +
+  geom_boxplot()+ scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.10)) + labs(title = "\nOscillospiraceae", subtitle = "by Species", x = 'Species',y = 'Oscillospiraceae')
+c3 <- ggplot(bigTab2, aes(x = species, y =  as.numeric(Prevotellaceae))) +
+  geom_boxplot()+ scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.10)) + labs(title = "\nPrevotellaceae", subtitle = "by Species", x = 'Species',y = 'Prevotellaceae')
+plot_grid(c1, c2, c3, ncol=3)
+```
+
+```{r  img11, warning = FALSE, message = FALSE, echo=FALSE }
+#line plots of samples by species of each family over time
+ggplot(data = bigTab2, aes(x = sampTime, y = Lachnospiraceae, col = species)) +geom_point() + labs(title ="11) Lachnospiraceae Overtime", subtitle = "by Lemur Species", x = "Sample Time", y = "Lachnospiraceae") +ylim(0,1)
+ggplot(data = bigTab2, aes(x = sampTime, y = Oscillospiraceae, col = species )) +geom_point()+ labs(title ="Oscillospiraceae Overtime", subtitle = "by Lemur Species", x = "Sample Time", y = "Oscillospiraceae")+ylim(0,1)
+ggplot(data = bigTab2, aes(x = sampTime, y = Prevotellaceae, col = species)) +geom_point()+ labs(title =" Prevotellaceae Overtime", subtitle = "by Lemur Species", x = "Sample Time", y = "Prevotellaceae")+ylim(0,1)
+```
+
+```{r img12, warning = FALSE, message = FALSE, echo=FALSE }
+ggplot(bigTab2, aes(x = sampDate, y = Lachnospiraceae, color = species)) + geom_point() + labs(title = "12) Lachnospiraceae by Sample Date", subtitle = "by Lemur Species", x = "Sample Date", y="Lachnospiraceae")
+ggplot(bigTab2, aes(x = sampDate, y = Oscillospiraceae, color = species)) + geom_point() + labs(title = "Oscillospiraceae by Sample Date", subtitle = "by Lemur Species", x = "Sample Date", y="Oscillospiraceae")
+ggplot(bigTab2, aes(x = sampDate, y = Prevotellaceae, color = species)) + geom_point()  + labs(title = "Prevotellaceae by Sample Date", subtitle = "by Lemur Species", x = "Sample Date", y="Prevotellaceae")
+```
+
+```{r img13, warning = FALSE, message = FALSE, echo=FALSE}
+l_var <- bigTab2 %>% 
+  group_by(species) %>% 
+  dplyr::summarise(var(Lachnospiraceae))
+kable(l_var, digits=3, caption = "Variance of Lachnospiraceae") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+
+o_var <- bigTab2 %>% 
+  group_by(species) %>% 
+  dplyr::summarise(var(Oscillospiraceae))
+kable(o_var, digits=3, caption = "Variance of Oscillospiraceae") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+
+p_var <- bigTab2 %>% 
+  group_by(species) %>% 
+  dplyr::summarise(var(Prevotellaceae))
+kable(p_var, digits=3, caption = "Variance of Prevotellaceae") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+\pagebreak
+
+]
+
+### Model Diagnostics
+
+```{r img14, warning = FALSE, message = FALSE, echo=FALSE }
+r_r_plot <- ggplot() + 
+  geom_point(aes(fitted(rich_model), residuals(rich_model))) +
+  ggtitle("14) Richness Model:\n Residuals vs Fitted") +
+  xlab("Fitted values") + ylab("Residuals") +
+  geom_hline(yintercept = 0, col='red')
+faith_r_plot <- ggplot() + 
+  geom_point(aes(fitted(o_model), residuals(o_model))) +
+  ggtitle("Faith's P.D. Model:\n Residuals vs Fitted") +
+  xlab("Fitted values") + ylab("Residuals") +
+  geom_hline(yintercept = 0, col='red')
+plot_grid(r_r_plot, faith_r_plot)
+```
+
+```{r img15, warning = FALSE, message = FALSE, echo=FALSE }
+p <- par(mfrow=c(1,2))
+qqnorm(residuals(rich_model), main = "15) Richness Model:\n Normal Q-Q Plot")
+qqline(residuals(rich_model), col='red')
+qqnorm(residuals(faith_model), main = "Faith's P.D. Model:\n Normal Q-Q Plot")
+qqline(residuals(faith_model), col='red')
+```
+
+```{r img16, warning = FALSE, message = FALSE, echo=FALSE }
+p <- par(mfrow=c(1,2))
+acf(residuals(rich_model), main = "16) Richness Model:\n Autocorrelation of Residuals")
+acf(residuals(faith_model), main = "Faith's P.D. Model:\n Autocorrelation of Residuals")
+```
+
+```{r img17, warning = FALSE, message = FALSE, echo=FALSE }
+vif_1 <- data.frame(vif(rich_model), vif(faith_model))
+colnames(vif_1) <-c("Richness Model", "Faith's P.D. Model")
+rownames(vif_1) <- c("Sampling Time", "Species", "Season", "Kit", "Sampling Time:Species", "Species:Season")
+
+kable(vif_1, digits = 3, caption = "Richness and Faith's P.D. VIF")  %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+```{r img18, warning = FALSE, message = FALSE, echo=FALSE }
+l_r_plot <- ggplot() + 
+  geom_point(aes(fitted(l_model), residuals(l_model))) +
+  ggtitle("18) Lachnospiraceae Model:\n Residuals vs Fitted") +
+  xlab("Fitted values") + ylab("Residuals") +
+  geom_hline(yintercept = 0, col='red')
+o_r_plot <- ggplot() + 
+  geom_point(aes(fitted(o_model), residuals(o_model))) +
+  ggtitle("Oscillospiraceae Model:\n Residuals vs Fitted") +
+  xlab("Fitted values") + ylab("Residuals") +
+  geom_hline(yintercept = 0, col='red')
+p_r_plot <- ggplot() + 
+  geom_point(aes(fitted(p_model), residuals(p_model))) +
+  ggtitle("Prevotellaceae Model:\n Residuals vs Fitted") +
+  xlab("Fitted values") + ylab("Residuals") +
+  geom_hline(yintercept = 0, col='red')
+plot_grid(l_r_plot, o_r_plot, p_r_plot)
+```
+
+```{r img19, warning = FALSE, message = FALSE, echo=FALSE }
+p <- par(mfrow=c(2,2))
+qqnorm(residuals(l_model), main = "19) Lachnospiraceae Model:\n Normal Q-Q Plot")
+qqline(residuals(l_model), col='red')
+qqnorm(residuals(o_model), main = "Oscillospiraceae Model:\n Normal Q-Q Plot")
+qqline(residuals(o_model), col='red')
+qqnorm(residuals(p_model), main = "Prevotellaceae Model:\n Normal Q-Q Plot")
+qqline(residuals(p_model), col='red')
+```
+
+```{r img20, warning = FALSE, message = FALSE, echo=FALSE }
+p <- par(mfrow=c(2,2))
+acf(residuals(l_model), main = "20) Lachnospiraceae Model:\n Autocorrelation of Residuals")
+acf(residuals(o_model), main = "Oscillospiraceae Model:\n Autocorrelation of Residuals")
+acf(residuals(p_model), main = "Prevotellaceae Model:\n Autocorrelation of Residuals")
+```
+
+```{r img21, warning = FALSE, message = FALSE, echo=FALSE }
+l_coll <- check_collinearity(l_model)
+kable(l_coll, digits = 3, caption = "Lachnospiraceae Model VIF")  %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+```{r img22, warning = FALSE, message = FALSE, echo=FALSE }
+o_coll <- check_collinearity(o_model)
+kable(o_coll, digits = 3, caption = "Oscillospiraceae Model VIF")  %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+```{r img23, warning = FALSE, message = FALSE, echo=FALSE }
+p_coll <- check_collinearity(p_model)
+kable(p_coll, digits = 3, caption = "Prevotellaceae Model VIF")  %>%
+  kable_styling(latex_options = "HOLD_position", font_size=7)
+```
+
+The residual plots (Image 14 & 18) show no significant curving or clustering with an even spread of residuals, satisfying the linearity and constant variance assumptions. While Richness biodiversity and Lachnospiraceae / Prevotellaceae Family Models appear to be slightly clustering, this may be the limitations of the model. The Q-Q plot observations (Image 15 & 19) all roughly closely follow the line, confirming the normality condition. While a slight deviations from normality are observed in the Faith's P.D. diversity and Lachnospiraceae Family model, the linear models appear to remain robust against these minor discrepancies. The autocorrelation function plot (Image 16 & 20) doesn't reveal significant correlation structures. The variance inflation factors (VIF) (Table 14 - 17) highlight no multi-collinearity concerns with the chosen predictors.

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<style>body{background-color:white;}</style>
+<script src="lib/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="lib/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="lib/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="lib/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="lib/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="lib/kePrint-0.0.1/kePrint.js"></script>
+<link href="lib/lightable-0.0.1/lightable.css" rel="stylesheet" />
+
+</head>
+<body>
+<table class="table" style="font-size: 7px; margin-left: auto; margin-right: auto;">
+<caption style="font-size: initial !important;">College Football Revenue Regression Model</caption>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> variable </th>
+   <th style="text-align:right;"> Estimate </th>
+   <th style="text-align:right;"> Std. Error </th>
+   <th style="text-align:right;"> t value </th>
+   <th style="text-align:right;"> Pr(&gt;|t|) </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> Intercept </td>
+   <td style="text-align:right;"> -1026473.915 </td>
+   <td style="text-align:right;"> 4148177.940 </td>
+   <td style="text-align:right;"> -0.247 </td>
+   <td style="text-align:right;"> 0.805 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> University Type: Public </td>
+   <td style="text-align:right;"> 677335.951 </td>
+   <td style="text-align:right;"> 3277308.669 </td>
+   <td style="text-align:right;"> 0.207 </td>
+   <td style="text-align:right;"> 0.836 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Spending </td>
+   <td style="text-align:right;"> 1.007 </td>
+   <td style="text-align:right;"> 0.130 </td>
+   <td style="text-align:right;"> 7.750 </td>
+   <td style="text-align:right;"> 0.000 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Total Undergrad Population </td>
+   <td style="text-align:right;"> 473.340 </td>
+   <td style="text-align:right;"> 157.466 </td>
+   <td style="text-align:right;"> 3.006 </td>
+   <td style="text-align:right;"> 0.003 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Football Category: Middle </td>
+   <td style="text-align:right;"> 5142223.600 </td>
+   <td style="text-align:right;"> 2152561.284 </td>
+   <td style="text-align:right;"> 2.389 </td>
+   <td style="text-align:right;"> 0.018 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Football Category: Top </td>
+   <td style="text-align:right;"> 23625642.324 </td>
+   <td style="text-align:right;"> 3315990.921 </td>
+   <td style="text-align:right;"> 7.125 </td>
+   <td style="text-align:right;"> 0.000 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Conf: BIG 10 </td>
+   <td style="text-align:right;"> 13023098.992 </td>
+   <td style="text-align:right;"> 3295049.831 </td>
+   <td style="text-align:right;"> 3.952 </td>
+   <td style="text-align:right;"> 0.000 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Conf: BIG 12 </td>
+   <td style="text-align:right;"> 12178300.129 </td>
+   <td style="text-align:right;"> 3094994.339 </td>
+   <td style="text-align:right;"> 3.935 </td>
+   <td style="text-align:right;"> 0.000 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Conf: PAC 12 </td>
+   <td style="text-align:right;"> 2570808.878 </td>
+   <td style="text-align:right;"> 3057602.087 </td>
+   <td style="text-align:right;"> 0.841 </td>
+   <td style="text-align:right;"> 0.401 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> Conf: SEC </td>
+   <td style="text-align:right;"> 15982685.844 </td>
+   <td style="text-align:right;"> 2969628.379 </td>
+   <td style="text-align:right;"> 5.382 </td>
+   <td style="text-align:right;"> 0.000 </td>
+  </tr>
+</tbody>
+</table> <script type="text/x-mathjax-config">MathJax.Hub.Config({tex2jax: {inlineMath: [["$","$"]]}})</script><script async src="https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</body>
+</html>

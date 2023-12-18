@@ -1,0 +1,8 @@
+"0","power5 <- target %>% 
+  filter(is.na(conference) == FALSE) %>% 
+  select(year, school, conference, fbcategory, ef_total_count,sector_name,total_rev_menwomen,
+         total_exp_menwomen)
+```
+"
+"2","Error: attempt to use zero-length variable name
+"

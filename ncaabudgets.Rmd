@@ -25,12 +25,10 @@ sports <- read.csv("sports.csv")
 ### Background
 College sports in the United States bring in over 15.8 billion dollars in revenue a year according to the NCAA in 2019. The lions share of those revenue come from football - with each school averaging 31.9 million dollars per school annually. These dollars come mainly from the huge TV streaming rights such as ESPN. The dominance of college football in revenue generation can be shown with a quick comparison. Duke University, one of the top programs in men's basketball (the 2nd most revenue generating sport), brings in approximately 37 million dollars while top football programs such as Alabama or Georgia reel in over 3 times that, at about 110 million dollars. 
 
-However, all these revenue dollars doesn't equate to a profitability. In 2019, only around 20% schools in the high grossing Football Bowl Subdivision (FBS) report a net positive operating margin (NCAA, 2019). Main expense items include 35% to administrative and coaches, 18% on athletic facilities, and 19% to student athletes themselves in the form of scholarships. Although the expenditure has also been steadily increasing over the last few years, athletic departments are not too concerned. 
-
 ### How does revenue work in college sports?  
 Unlike professional sports, athletic departments do not have bottom line-profits and stockholders that pressure them; instead the stakeholders such as alumni, students, and boosters want victories. Aside from just an increase in revenue, a great sports scene makes good publicity for the school, increases the recruiting odds of top athletes (who generate more revenue and victories), contribute to the total number of applications, and also can positively impact alumni donations. This makes our analysis ever more interesting, as it deviates from the traditional sports business incentive alignments slightly.
 
-The NCAA DOES NOT CONTROL football revenues and how they are shared, in fact they have zero decision making power here. The conferences themselves all make and control their own football revenue (including from the media). For example, the ACC
+The NCAA DOES NOT CONTROL football revenues and how they are shared, in fact they have zero decision making power here. The conferences themselves all make and control their own football revenue (including from the media). Usually, the distribution is largely split evenly, with heavier emphasis for teams playing on prime time ESPN, or winning in the College Football Playoffs. Each conference receives 6 million dollars from the College Football Playoff for each team selected for a semifinal game and 4 million for each time that plays in a non-playoff bowl. The Big 10 distributes those payouts evenly after the participating team keeps some to pay for the expenses of the playoff trip (Big 10 Handbook). So it doesn't make a huge difference if it is Wisconsin or Michigan going to represent the Big 10 in the playoff - all the Big 10 teams will receive a even split of the pot. However, not all conferences have this same policy. The ACC has recently committed to a new revenue model that rewards schools more based on postseason performance in hopes of closing the revenue gap from SEC and Big 10. 
 
 ### Why does it matter? 
 The landscape of NCAA sports has undergone dynamic transformations in recent years, with a central focus on the financial implications of collegiate athletics. The rise of NIL deals from July 1st of 2021 has greatly impacted the entrepreneurial ventures of student athletes since they are now allowed to promote their "Name, Image, and Likeness" in brand sponsorships, advertisements, and other deals. More importantly, the impact of recent conference realignments further amplifies the complexities surrounding sports budgets. Conference shifts not only reshape competitive dynamics but also pose significant financial challenges and opportunities, with schools strategically positioning themselves to maximize revenue potential. 
@@ -44,53 +42,209 @@ Understanding these dynamics is key for institutions seeking to optimize their f
 
 ### Dataset Overview
 
-The data I'll be working with are from the tidytuesday collection of datasets and Knight-Newhouse College Athletics Database. Specifically, the main dataset from tidytuesday came from Equity in Athletics Data Analysis, a sub department of the US Department of Education. The years included span from 2015-2019. However I've gone ahead and done the work to conjoin that with data from 2020, 2021, and 2022. Some of the main variables we will use study include: school, year, sport, spending, # of male student athletes, # of female student athletes, revenue men, revenue women, expenditure men, expenditure women. I've also feature engineered out a 'conference' variable for obvious reasons. 
+The data I'll be working with are from the tidytuesday collection of datasets and Knight-Newhouse College Athletics Database. Specifically, the main dataset from tidytuesday came from Equity in Athletics Data Analysis, a sub department of the US Department of Education. The NCAA is obligated to report their financial statements every fiscal year - which is the original source. The years included span from 2015-2019. However I've gone ahead and done the work to conjoin that with data from 2020, 2021, and 2022. Some of the main variables we will use study include: school, year, sport, spending, # of male student athletes, # of female student athletes, revenue men, revenue women, expenditure men, expenditure women. I've also feature engineered out a 'conference' variable for obvious reasons. 
 
 ### EDA: Power 5 Conference Revenue 
 
+Let's take a first look at the current state of the Power 5 conference revenues over the last 10 years. The Power 5 Conferences are the most prominent athletic conferences in college football, consisting of the Big 10, ACC, Big 12, SEC, and Pac 12. 
 ```{r conferenceEDA, message=FALSE, warning=FALSE, echo=FALSE}
 # Create vectors for the dataset
-years <- rep(2013:2022, each = 2)  # Repeats each year twice (for men and women)
-conferences <- rep(c("Conference A", "Conference B"), times = 10)  # Assumes two conferences
-revenue <- c(100, 120, 110, 130, 105, 125, 115, 135, 95, 115)  
-
-
+years <- rep(2012:2022, each = 5)  
+conferences <- rep(c("ACC","BIG 10", "BIG 12", "PAC-12", "SEC"), times = 11)  
+revenue <- c(22.54, 31.31, 24.27, 15.18, 32.07,
+             23.23, 32.38, 30.94, 23.53, 31.44,
+             26.13,34.42,32.42,26.11,30.90,
+             30.74,39.47,35.15,30.15,40.98,
+             32.55,41.93,42.04,34.13,50.90,
+             35.69,45.88,43.89,37.19,52.59,
+             33.58,61.32,43.58,36.37,55.86,
+             35.34,63.34,48.64,37.89,55.75,
+             33.99,60.52,44.77,37.40,55.42,
+             37.26,46.61,39.05,21.61,80.51,
+             41.70,62.96,49.12,40.38,59.28
+             )  
 # Create a data frame
-conference_revenues <- data.frame(year = years, conference = conferences, revenue_men = revenue_men)
-
-# Print the resulting dataset
-print(conference_revenues)
-
-# Save the dataset as a CSV file
-write.csv(conference_revenues, file = "/conference_revenues_2013_2022.csv", row.names = FALSE)
-
+conference_revenues <- data.frame(year = years, conference = conferences, revenue = revenue)
 ```
 
+```{r lineplotEDA, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(conference_revenues, aes(x = year, y = revenue, color = conference, group = conference)) +
+  geom_line() +
+  labs(title = "Conference Median Revenue Over the Last 10 Years",
+       x = "Year",
+       y = "Revenue",
+       subtitle = "Big 10, SEC on top with a sizable moat to the rest",
+       caption = "Note: Revenue in millions From NCAA Conference Distribution, Media Rights, and Post-Season Football") +
+  theme_minimal() +
+  scale_x_discrete(limits = c(2012,2014,2016,2018,2020,2022))
+```
 
-figure name Big 10, SEC conferences on top with a growing moat to the rest
+Even in a conference such as the ACC, 4th in revenue currently among all Division I conferences -- schools like Clemson, North Carolina, and Florida State are looking to leave. One of the reasons for the schools wanting to leave is the sizeable gap in revenue when comparing the ACC to the Big Ten and SEC. The revenue for the 2022 fiscal year is out for the ACC and while they saw an increase in total revenue, it still trails the other two conferences. 
 
-
-
-Even in a conference such as the ACC, 3rd in revenue among all Division I conferences -- schools like Clemson, North Carolina, and Florida State are looking to leave. One of the reasons for the schools wanting to leave is the sizeable gap in revenue when comparing the ACC to the Big Ten and SEC. The revenue for the 2022 fiscal year is out for the ACC and while they saw an increase in total revenue, it still trails the other two conferences.
+It's also important to call out the impact of COVID-19 in the 2021 season, which hampered some conferences that took more extreme measures and therefore played less games which led to less media revenue.  
 
 ## Methodology
 
 ### Clustering Analysis
-Who will be the biggest benefactors of new conferences? Will it be those who join? Will it instead be the existing powerhouses? In order to find out, I will create categorical groupings of schools based upon a set of heuristics. There will be three main types of schools: large, traditional powerhouses that are within the top 3 schools in revenue generation, middle of the pack schools that do well in revenue generation, and bottom-feeders mainly gaining revenue from shared conference media deals. 
+In order to assess the potential impact of new conference affiliations and identify the schools likely to be the biggest benefactors, a systematic categorization approach is implemented. This involves the creation of a new categorical variable to represent the football performance tier of each school—whether they are considered top, middle, or bottom schools within their respective conferences. The criteria for this categorization are grounded in heuristics that capture the historical success and performance of each school in football over the last five years. Specifically, schools that consistently rank within the top three in football performance within their conference are classified as "top" schools. Those that perform well but rarely secure conference championships fall into the "middle" category, while schools with limited success and infrequent achievements in their conference are labeled as "bottom-feeders." This classification method provides a nuanced understanding of each school's football prowess, enabling a more targeted analysis of how different categories of schools may benefit from or be impacted by new conference affiliations.
+
+To determine the potential beneficiaries of new conferences, the focus is not solely on the schools joining or those already established as powerhouses. Instead, the analysis revolves around assessing the performance dynamics within these categorizations. By evaluating average records and bowl game attendances over the past five years, a comprehensive picture emerges regarding the sustained success and competitiveness of each school. This multifaceted approach allows for a nuanced exploration of the potential consequences of conference realignments, considering both the incoming schools and the existing powerhouses. As a result, the methodology goes beyond a simplistic view and delves into the intricacies of football performance, shedding light on the varying positions of schools within their conferences and paving the way for a more informed examination of the evolving landscape of college football. 
 
 ### Revenue Modeling through Regression 
-To understand the relative impact of conference on spending, I plan to fit a multivariate linear regression predicting total revenues for schools, and use the predictions from fitted model to quantify the impact of specific schools shifting conferences. 
+To understand the relative impact of conference on revenue, I plan to fit a multivariate linear regression predicting total revenues for schools, and use the predictions from fitted model to quantify the impact of specific schools shifting conferences. 
 
-The proposed methodology of fitting a multivariate linear regression to predict total revenues for schools and using the model predictions to quantify the impact of specific schools shifting conferences is justified for several reasons. First, 
+$$\text{Revenue} = \beta_0 + \beta_1\text{conference} + \beta_2 \text{enrollment}  + \beta_3 \text{spending} + \beta_4 \text{schooltype} + \beta_5 \text{fbcategory} + \epsilon$$
 
-Assumptions for the regression model would be independence, normality, and also linearity -- which we can run model diagnostics on (Appendix A).
+The proposed methodology of fitting a multivariate linear regression to predict total revenues for schools and using the model predictions to quantify the impact of specific schools shifting conferences is justified for several reasons. First, since the goal is to quantify the specific revenue impacts of conference realignments, its appropriate to use a regression model as it fit most appropriately to obtain a numerical prediction. Furthermore, a regression model allows us to control for other factors such as the # of school student athletes, conference, spending, private vs public school, and the football category. 
+
+A linear regression specifically optimizes for an ease of interpretation and we can use the coefficients for conference variables to directly interpret an estimated change in total revenues - holding all other variables constant.  
+
+Assumptions for the regression model would be independence, normality, and also linearity -- which we can run model diagnostics on (Appendix A). Additionally, this methodology provides a basis for sensitivity analysis. By examining how changes in conference affiliation affect the predicted revenues, we can assess the robustness of the model and the relative importance of conference changes compared to other variables.
+
+### Accounting for Changes in Media Deals 
+In order to ensure the robustness of our revenue predictions and acknowledge the evolving landscape of college football finances, a crucial consideration involves accounting for changes in media deals. While our dataset relies heavily on the assumption that past revenue is indicative of future revenues, this approach may not fully capture the dynamic impact of shifts in media and television streaming rights—a major driver of revenues in college football. To address this limitation, a comprehensive exploration of the latest media deals with all of the Power 5 Conferences is undertaken. This investigation extends beyond the quantitative realm and includes qualitative analyses to provide a more nuanced understanding of the factors influencing future revenues. By delving into the intricacies of media agreements, we aim to enhance the predictive accuracy of our revenue model, acknowledging the influential role of media rights in shaping the financial landscape of college football. This approach underscores a commitment to staying abreast of industry changes and aligning our predictions with the contemporary realities that significantly shape the revenue streams of collegiate sports programs.
 
 ## Results
+```{r conferences, message=FALSE, warning=FALSE, echo=FALSE}
+ACCs <- c("Boston College", "Clemson", "Duke", "Florida State", "Georgia Institute of Technology",
+         "Louisville", "Miami", "North Carolina at Chapel Hill",
+         "North Carolina State University at Raleigh", "Pittsburgh", "Syracuse",
+         "Virginia", "Virginia Polytechnic Institute and State",
+         "Wake Forest")
+
+BIG12s <- c("Baylor", "Iowa State", "Kansas", "Kansas State", "Oklahoma-Norman Campus", "Oklahoma State University", "Texas Christian", "The University of Texas at Austin", "Texas Tech", "West Virginia")
+
+BIG10s <- c("Indiana University-Bloomington", "Illinois at Urbana-Champaign", "Iowa", "Maryland-College Park",
+            "Michigan-Ann Arbor", "Michigan State", "Minnesota-Twin Cities", "Nebraska-Lincoln", 
+            "Northwestern", "Ohio State", "Pennsylvania State", "Purdue", "Rutgers University-New Brunswick",
+            "Wisconsin-Madison")
+PAC12s <- c("Arizona State University-Tempe", "Arizona", "California-Berkeley", "California-Los Angeles",
+            "Colorado Boulder", "Oregon", "Oregon State", "Stanford", "Southern California", "Utah",
+            "Washington-Seattle Campus", "Washington State")
+
+SECs <- c("The University of Alabama", "Auburn", "Arkansas","Florida","Georgia", "Kentucky",
+          "Louisiana State University and Agricultural & Mechanical College",
+          "Mississippi State", "Mississippi", "Missouri-Columbia", "South Carolina-Columbia",
+          "The University of Tennessee-Knoxville", "Texas A & M University-College Station",
+          "Vanderbilt")
+```
+
+```{r categories, message=FALSE, warning=FALSE, echo=FALSE}
+tops <- c("The University of Alabama", "Georgia", "Auburn",
+          "Clemson","Florida State", "North Carolina at Chapel Hill",
+          "The University of Texas at Austin","Oklahoma-Norman Campus","Texas Christian",
+          "Ohio State", "Michigan", "Pennsylvania State",
+          "Utah","Oregon", "Washington-Seattle Campus")
+
+mids <- c("Florida","Kentucky","Louisiana State University and Agricultural & Mechanical College",
+          "Mississippi State", "Mississippi","Texas A & M University-College Station","The University of Tennessee-Knoxville", "South Carolina-Columbia","Miami","Louisville", "Virginia Polytechnic Institute and State", "Baylor", "Texas Tech", "Oklahoma State University", "West Virginia", "Michigan State",
+          "Illinois at Urbana-Champaign", "Wisconsin-Madison", "Northwestern", "Iowa",
+          "California-Los Angeles","Colorado Boulder", "Oregon State", "Washington State", "Southern California")
+
+bottoms <-c("Arkansas","Missouri-Columbia","Vanderbilt","Boston College", "Duke", "Georgia Institute of Technology", "Virginia", "North Carolina State University at Raleigh", "Syracuse", "Pittsburgh", "Wake Forest",
+            "Iowa State", "Kansas", "Kansas State", "Indiana University-Bloomington",
+            "Minnesota-Twin Cities", "Purdue", "Rutgers University-New Brunswick", "Maryland-College Park", "Nebraska-Lincoln", "Arizona State University-Tempe", "Arizona", "California-Berkeley",
+            "Stanford")
+```
+
+
+```{r cleaning, message=FALSE, warning=FALSE, echo=FALSE}
+target <- sports %>% 
+  filter(sports == "Football", classification_code==1)
+target$institution_name <- sub(" University$", "", target$institution_name)
+target$institution_name <- sub("^University of ", "", target$institution_name)
+target$institution_name <- sub("-Main Campus$", "", target$institution_name)
+
+colnames(target)[4] = "school"
+
+target$conference <- NA
+
+# Assign conferences based on school names
+target$conference[target$school %in% ACCs] <- "ACC"
+target$conference[target$school %in% BIG12s] <- "BIG12"
+target$conference[target$school %in% BIG10s] <- "BIG10"
+target$conference[target$school %in% PAC12s] <- "PAC12"
+target$conference[target$school %in% SECs] <- "SEC"
+
+target$fbcategory <- NA
+#Assign category based on school performance 
+target$fbcategory[target$school %in% tops] <- "Top"
+target$fbcategory[target$school %in% mids] <- "Mid"
+target$fbcategory[target$school %in% bottoms] <- "Bottom"
+
+#filter for power 5 and get relevant variables
+power5 <- target %>% 
+  filter(is.na(conference) == FALSE) %>% 
+  select(year, school, conference, fbcategory, ef_total_count,sector_name,total_rev_menwomen,
+         total_exp_menwomen)
+```
+
+```{r regmodel, message=FALSE, warning=FALSE, echo=FALSE}
+model <- lm(total_rev_menwomen ~ as.factor(sector_name) + total_exp_menwomen + ef_total_count + as.factor(fbcategory) + as.factor(conference), data = power5)
+
+```
+
+```{r modeloutput, message=FALSE, warning=FALSE, echo=FALSE}
+output = as.tibble(summary(model)$coeff)
+temp = c("Intercept", "University Type: Public", "Spending", "Total Undergrad Population",
+         "Football Category: Middle", "Football Category: Top", "Conf: BIG 10", "Conf: BIG 12",
+         "Conf: PAC 12", "Conf: SEC")
+
+output$variable <- temp
+
+# Reorder the columns to have the new column as the first one
+output <- output[, c("variable", names(output)[-ncol(output)])]
+
+
+kable(output, digits = 3, caption = "College Football Revenue Regression Model") %>%
+  kable_styling(latex_options = "HOLD_position", font_size=10)
+```
+
+There are a few big takeaways from this regression model. First, we find spending, total undergrad population, middle and top performing football team categories, and Big 10, Big 12, and SEC conferences to be significant at the p = 0.05 level. More tangibly, we see that the coefficients are positive for all of the significant factors, showing higher revenue correlation with for teams in doing well in the aforementioned significant conferences.
+
+The coefficient for spending is 1.007, meaning an increase in one dollar spending would roughly equate to increase in revenue by equal parts, all else held the same. This tracks from a logical perspective, as higher grossing teams would have more budget to spend. 
+
+The SEC has the largest coefficient among the conferences at about 15.9 million, meaning that a school in the SEC (on average) would earn approximately 15.9 million more than a school in the ACC, all else held the same. The top bucket of football performers (on average) would have earned about 23.6 million more than a school in the bottom bucket, all else held the same. Lastly, the coefficient for total undergraduate population is about 473, meaning that for an additional student enrollment, the school's revenue could increase by about 473 dollars on average, holding all other variables constant. 
+
+### School Predictions
+
+We now apply this model to obtain some projections for schools that are going to a new conference. 
+
+```{r predictions, message=FALSE, warning=FALSE, echo=FALSE}
+predictions <- data.frame(
+  schools = c("UCLA", "Oregon", "Texas", "Cal Berkeley"),
+  fb_category = c("Mid", "Top", "Top", "Bottom"),
+  current_conference = c("PAC 12", "PAC 12", "BIG 12", "PAC-12"),
+  new_conference = c("BIG 10", "BIG 10", "SEC", "ACC"),
+  currentrev = c(40.66, 40.73, 42.24, 37.89),
+  prednewrev = c(54.34, 64.85, 73.4, 32.18)
+)
+
+kable(predictions, format = "latex", booktabs = TRUE, col.names = c("School", "FB Category", "Current Conf","New Conf", "Current Rev", "Predicted New Rev"), caption = "Projected New Revenues of 4 Schools with a New Conference") %>% 
+  kable_styling(latex_options = "HOLD_position", font_size=10)
+```
+
+It's no surprise that the top schools in a conference leaving to join a more lucrative conference would result in the largest percentage projected increase in revenue. Although currently UCLA and Oregon both bring in about 40 million in revenue, this will start to diverge more as they enter the Big 10 due to how competitive the conference is. Furthermore, a school such as Cal Berkeley (a bottom-feeder in terms of college football in the Pac 12) will only decrease its projected revenue as it moves to a less lucrative conference in the ACC.
+
+### Media Deal Analysis 
+
+* list item 1
+  + item 2
+  + item 3
 
 ## Discussion
 
+
+
+### Limitations
+
+Our paper based these projections still based on payouts and media from a 4 team playoffs structure. However, beginning in 2024, the College Football Playoffs will expand from 4 to 12 teams, bringing in an estimated additional 1.7 billion dollars annually (McCarthy, 2022). Additional analysis should be conducted to take this into account as this would greatly inflate projected revenues for all conferences that make it in. 
+
+It's important to note that since we have teams from multiple years in the dataset, there poses a violation of independence between revenues from the same team but different years. Furthermore, the classifications of football teams into different categories was more subjective opinion based upon my opinions (one could argue that Oklahoma State is a "top" contender in the Big 12 over TCU). 
+
+
 ### Future Work: The Flip Side of the Balance Sheet
-We focused mainly on the revenue side of things - however, as mentioned before only a small fraction of all collegiate athletics programs are profitable. Furthermore, some argue that the spending isn't even going into the right places. On the other side of the balance sheet, what can the spending patterns tell us about future projected spending across college football? Is the road to profitability more clear with these new conferences? 
+We focused mainly on the revenue side of things - however, only a small fraction of all collegiate athletics programs are profitable. In 2019, only around 20% schools in the high grossing Football Bowl Subdivision (FBS) report a net positive operating margin (NCAA, 2019). Main expense items include 35% to administrative and coaches, 18% on athletic facilities, and 19% to student athletes themselves in the form of scholarships. Furthermore, some argue that the spending isn't even going into the right places. On the other side of the balance sheet, what can the spending patterns tell us about future projected spending across college football? Is the road to profitability more clear with these new conferences? 
 
 
 ## Appendix 
@@ -98,9 +252,19 @@ We focused mainly on the revenue side of things - however, as mentioned before o
 ### Works Cited
 
 https://www.usatoday.com/story/sports/college/2023/05/19/power-5-conferences-earnings-billions-2022/
+
 https://knightnewhousedata.org/reports/34d8027f 
+
+https://frontofficesports.com/expanded-cfp-media-rights-could-double-current-deal/
+
 https://www.washingtonpost.com/sports/2023/08/07/college-sports-conference-realignment/ 
+
 https://ope.ed.gov/athletics/#/datafile/list
+
 https://athleticdirectoru.com/articles/revenue-per-quality-of-college-football-recruit/
+
 https://ncaaorg.s3.amazonaws.com/research/Finances/2020RES_D1-RevExp_Report.pdf 
+
 https://www.pbs.org/newshour/economy/analysis-who-is-winning-in-the-high-revenue-world-of-college-sports 
+
+https://businessofcollegesports.com/college-football-playoff-payouts/
